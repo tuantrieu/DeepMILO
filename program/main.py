@@ -43,9 +43,9 @@ import data_generator
 import common_data_generation as cdg
 
 
-os.environ["CUDA_VISIBLE_DEVICES"] = "4,5,6,7"
+#os.environ["CUDA_VISIBLE_DEVICES"] = "4,5,6,7"
 loop_model_file = 'loop_pred_4k_1gpu.h5'
-ngpu = 4
+ngpu = 1
 
 batch_size = 24 * ngpu
 
@@ -169,8 +169,9 @@ print('Done preparing data')
 ############################### Running the model for all patients
 
 print('Loading model')
-model = load_model(loop_model_file) 
-model = multi_gpu_model(model, gpus = ngpu)
+model = load_model(loop_model_file)
+if ngpu > 1:
+    model = multi_gpu_model(model, gpus = ngpu)
 
 
 patient_files = os.listdir(inputFolder)

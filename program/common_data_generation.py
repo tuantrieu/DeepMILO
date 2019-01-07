@@ -17,6 +17,8 @@ import re
 import random
 from Bio import SeqIO
 import copy
+from variant_class import Variant
+from boundary_class import Loop,Boundary
 
 def get_overlap(x, y):
     '''Return overlap length of 2 intervals'''
@@ -784,10 +786,210 @@ def addCTCFOrientation(regions, ctcfs):
     return(regions)
 
 
+def getSV(stvm_file):
+
+    variants = {}
+
+    processed_sv = set()
+
+    with open(stvm_file,'r') as fin:
+        ln = fin.readline()
+        fields = re.split('\t', ln)
+        field2Id = {}
+        for i in range(len(fields)):
+            field2Id[fields[i]] = i
+
+        sv_header_id = field2Id['sv_id']
+        variant_type_id = field2Id['variant_type']
+        chr_from_id = field2Id['chr_from']
+        chr_to_id = field2Id['chr_to']
+        icgc_sample_id = field2Id['icgc_sample_id']
+        chr_from_bkpt_id = field2Id['chr_from_bkpt']
+        chr_to_bkpt_id = field2Id['chr_to_bkpt']
+
+
+        for ln in fin.readlines():
+            st = re.split('\t', ln)
+
+
+            sv_id = st[sv_header_id]
+
+            if sv_id in processed_sv:
+                continue
+
+            processed_sv.add(sv_id)
+
+            svtype = st[variant_type_id]
+
+    #        if svtype == 'unbalanced translocation':
+    #            continue
+
+            chrid_from = st[chr_from_id].upper()
+            chrid_to = st[chr_to_id].upper()
+
+            #ignore inter-chromosome SV
+            if (chrid_from != chrid_to) or (not re.search('^[0-9XY]+', chrid_from))\
+                        or (not re.search('^[0-9XY]+', chrid_to)):
+                continue
+
+            sample_id = st[icgc_sample_id]
+            if sample_id not in variants:
+                variants[sample_id] = []
+
+
+            chrom = 'chr' + chrid_from
+            start = int(st[chr_from_bkpt_id]) - 1
+            end = int(st[chr_to_bkpt_id])
+
+
+            if svtype == 'deletion':
+                svtype = 'DEL'
+            elif svtype == 'inversion':
+                svtype = 'INV'
+            elif svtype == 'tandem duplication':
+                svtype = 'DUP'
+
+            ref = ''
+            alt = ''
+            gt = '1|1'
+            vt = 'sv'
+
+
+            var = Variant('', chrom, start, end, vt, svtype, ref, alt, gt)
+            variants[sample_id].append(var)
+
+
+    len(variants)
+    return(variants)
+
+def getSSM(ssm_file):
+
+
+    variants = {} # icgc_sample_id: variants
+    processed_mut = set() # processsed mutation to handle duplicate records
+
+    #for i in range(len(ssm)):
+    with open(ssm_file, 'r') as fin:
+        ln = fin.readline()
+        fields = re.split('\t', ln)
+        field2Id = {}
+        for i in range(len(fields)):
+            field2Id[fields[i]] = i
+
+
+        icgc_mutation_id = field2Id['icgc_mutation_id']
+        chromosome_id = field2Id['chromosome']
+        chromosome_start_id = field2Id['chromosome_start']
+        chromosome_end_id = field2Id['chromosome_end']
+        mutation_type_id = field2Id['mutation_type']
+        reference_genome_allele_id = field2Id['reference_genome_allele']
+
+        if 'tumour_genotype' in fields:
+            tumour_genotype_id = field2Id['tumour_genotype']
+        else:
+            mutated_to_allele_id = field2Id['mutated_to_allele']
+
+        icgc_sample_id = field2Id['icgc_sample_id']
+
+
+        for ln in fin.readlines():
+
+            st = re.split('\t', ln)
+
+            mut_id = st[icgc_mutation_id]
+
+            if mut_id in processed_mut:
+                continue
+
+            processed_mut.add(mut_id)
+
+
+            chrid = str(st[chromosome_id]).upper()
+            if not re.search('^[0-9XY]+', chrid):
+                continue
+
+            start = int(st[chromosome_start_id]) - 1
+            end = int(st[chromosome_end_id])
+            vt = st[mutation_type_id]
+
+            ref = st[reference_genome_allele_id]
+
+
+            if 'tumour_genotype' in fields:
+                #control_gt = ssm.loc[i, 'control_genotype']
+                tumor_gt = st[tumour_genotype_id]
+            else:
+                tumor_gt = st[mutated_to_allele_id]
+
+            sample_id = st[icgc_sample_id]
+
+            if sample_id not in variants:
+                variants[sample_id] = []
+
+            '''
+            mutating by replacing ref. with alt.
+            if alt == '', in insertation, it means no insertation ( if ref == '')
+                          in deletion, it means deleting ref
+                          
+            if insertion, ref is always -, must be converted to ''
+            '''
+            #Variant(sample, rc.CHROM, start, end, dvt, dsvtype, rc.REF, rc.ALT, gt )
+
+            ref = '' if ref == '-' else ref
+
+            if re.search('substitution', vt):
+                vt = 'snp'
+                svtype = ''
+            elif re.search('deletion', vt):
+                vt = 'indel'
+                svtype = 'del'
+            elif re.search('insertion', vt):
+                vt = 'indel'
+                svtype = 'ins'
+
+
+            #alternative
+            alt = re.split('[|/]',tumor_gt)
+            alt = [x if x != '-' else '' for x in alt] #convert '-' to empty
+
+            if len(alt) == 1: # if there is only one allele, make another from it
+                alt.append(alt[0])
+
+            #0: for reference seq, therefore + 1
+            #if insertion, gt = '' can be 0
+            gt = '|'.join([str(alt.index(x) + 1) for x in alt])
+
+            if vt == 'snp' and ref == '':
+                print('error, snp but ref. is not available')
+
+            var = Variant('', 'chr' + chrid, start, end, vt, svtype, ref, alt, gt)
+            variants[sample_id].append(var)
+
+    len(variants)
+    return(variants)
 
 
 
 
+def getLoopXLSX(con_file):
 
+    if con_file.endswith('.xlsx'):
+        con_loop = pd.read_excel(con_file, header=None)
+
+        con_loop.head()
+
+        len(con_loop)
+
+
+        loops = []
+        for i in range(len(con_loop)):
+            b1st = re.split('[:-]', con_loop.iloc[i,0])
+            b2st = re.split('[:-]', con_loop.iloc[i,1])
+            b1 = Boundary(b1st[0], int(b1st[1]), int(b1st[2]))
+            b2 = Boundary(b2st[0], int(b2st[1]), int(b2st[2]))
+
+            loops.append(Loop(b1,b2))
+
+    return(loops)
 
 
