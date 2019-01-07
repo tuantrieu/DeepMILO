@@ -9,9 +9,6 @@ Created on Mon Apr 16 16:09:01 2018
 import vcf
 import re
 import numpy as np
-from Bio.Alphabet import generic_dna
-from Bio.Seq import Seq
-from Bio.Seq import MutableSeq
 
 import random
 import common
