@@ -1,5 +1,5 @@
 '''
-Data generate for input as sequences and output as boundaries
+Data generation for input as sequences and output as boundaries
 '''
 import numpy as np
 import keras
@@ -14,8 +14,10 @@ class DataGenerator(keras.utils.Sequence):
     def __init__(self, data_file, label_file, batch_size=32, dim=(1000, 10), n_channels=1,
                  shuffle=True, rnn_len=0, use_reverse=True, rnn_only=False):
         '''
+        shuffle: shuffle data for training, in validation and testing set it to False
         rnn_len: len of the RNN layer
         use_reverse: whether to consider the reverse strand (with label ends with _2), can be used during testing
+        rnn_only: return data for RNN only
         '''
         'Initialization'
 
@@ -57,18 +59,16 @@ class DataGenerator(keras.utils.Sequence):
                     self.ids_list.append(k)
 
             le = int(np.floor(len(self.ids_list) / self.batch_size))
+            #taking care of the case when number of samples < batch_size: randomly add samples to make a full batch size
             if le * self.batch_size < len(self.ids_list):
                 
                 shortage = (le + 1) * self.batch_size  - len(self.ids_list) # add this number of samples to 
-                
-                
+
                 i = 1
                 while len(self.ids_list) * i < shortage:
                     i += 1
                     
                 add = random.sample(self.ids_list * i, shortage) # randomly sample
-
-                
                 self.ids_list = self.ids_list  + add
                 
         finally:
@@ -234,6 +234,7 @@ class DataGeneratorLoopSeq(keras.utils.Sequence):
                 
 
             le = int(np.floor(len(self.ids_list) / self.batch_size))
+            #taking care of the case when number of samples < batch_size: randomly add samples to make a full batch size
             if le * self.batch_size < len(self.ids_list):
                 
                 shortage = (le + 1) * self.batch_size  - len(self.ids_list) # add this number of samples to 
