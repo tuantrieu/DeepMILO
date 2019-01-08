@@ -4,6 +4,7 @@
 
 ## Folder content:
 * model: contains the loop model
+* input: contains sample input files (simple somatic mutation from ICGC)
 * loopDB:
 	* constitutive_loops.xlsx: list of constitutive loops
 	* constitutive_loop_probability.txt: probability of constitutive loops without mutations 	
@@ -22,7 +23,8 @@
   + another folder contains output loop probability prediction for each patient
 
 ### Run: 
-	python main.py ssm.tsv sv.tsv
+	python main.py -ssm input/simple_somatic_mutation.open.tsv
+	python main.py -ssm input/ssm.ts -sv input/sv.tsv
 
 
 
