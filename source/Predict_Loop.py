@@ -8,7 +8,7 @@ Created on Fri Apr 13 14:16:54 2018
 Loop model to predict loop from sequence only
 
 Note: when training on multiple GPU, loading into a single GPU results in error. 
-Try to save the single-GPU model (before it is copied to multiple GPUs), it shares the same weights
+Try to save the single-GPU model (before it is copied to multiple GPUs), they shares the same weights
 """
 
 import os
@@ -69,8 +69,8 @@ boundary_direction_file = 'direction_pred_4k_1gpu.h5' #'direction_pred_4k_9642_t
 
 
 
-output_model_cnn = "loop_pred_%dk%s_FullUnbalanced.h5" % (segment_size/1000, version)
-output_best_model = "loop_pred_%dk_best%s_FullUnbalanced.h5" % (segment_size/1000, version)
+output_model_cnn = "loop_pred_%dk%s.h5" % (segment_size/1000, version)
+output_best_model = "loop_pred_%dk_best%s.h5" % (segment_size/1000, version)
 
 
 
@@ -228,8 +228,8 @@ parallel_model.compile(loss='binary_crossentropy', optimizer='rmsprop',
 print('best model monitored')
 flog.write('best model monitored')
 
-parallel_model.save(output_model_cnn)
-parallel_model.save_weights(output_best_model)
+# parallel_model.save(output_model_cnn)
+# parallel_model.save_weights(output_best_model)
 
 model.save(output_model_cnn.replace('.h5','_1gpu.h5'))
 model.save_weights(output_best_model.replace('.h5','_1gpu.h5'))

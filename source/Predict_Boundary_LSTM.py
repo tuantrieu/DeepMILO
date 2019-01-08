@@ -194,8 +194,8 @@ flog.write('best model monitored')
 common_function_evaluation.evaluate(pmodel, test_generator, title = 'Boundary prediction',label='GM12878 test (nopooling)', curvefile='gm12878_test')
 
 
-pmodel.save(output_model_cnn)
-pmodel.save_weights(output_best_model)
+# pmodel.save(output_model_cnn)
+# pmodel.save_weights(output_best_model)
 
 model.save(output_model_cnn.replace('.h5','_1gpu.h5'))
 model.save_weights(output_best_model.replace('.h5','_1gpu.h5'))
