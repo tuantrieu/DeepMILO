@@ -42,11 +42,26 @@ import boundary_class
 import data_generator
 import common_data_generation as cdg
 
+import argparse
+
+parser = argparse.ArgumentParser(description='Process some integers.')
+parser.add_argument('-ssm', dest='ssm', default="", help='simple somatic mutation file')
+parser.add_argument('-sv', dest='sv', default="", help='structural variant file')
+
+opts = parser.parse_args()
+
+# retrieve mutations file name from arguments
+inputF = 'tsv' #format file
+ssmFileName = opts.ssm
+svFileName = opts.sv
+
+
+
 # os.environ["CUDA_VISIBLE_DEVICES"] = "4,5,6,7"
-loop_model_file = 'loop_pred_4k_1gpu.h5'
+loop_model_file = 'model/loop_pred_4k_1gpu.h5'
 ngpu = 1 # number of gpu to use, combine with os.environ above if necessary
 
-# parameters to load data 
+# parameters to load data
 batch_size = 24 * ngpu
 
 segment_size = 4000
@@ -76,10 +91,7 @@ if not os.path.exists(outputFolder):
 
 loopFile = 'loopDB/constitutive_loops.xlsx'
 
-# retrieve mutations file name from arguments
-inputF = 'tsv'
-ssmFileName = sys.argv[1]
-svFileName = sys.argv[2]
+
 
 
 ###########################################################
