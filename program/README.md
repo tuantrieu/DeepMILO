@@ -19,12 +19,17 @@
 
 
 ### Output: 2 folders
-  + one folder contain input files, one for each patient, contains sequences of loops taking into consideration mutations from patients
-  + another folder contains output loop probability prediction for each patient
+  + one folder contains sequence data for patients taking into consideration mutations from patients 
+  + another folder contains loop probability predictions for each patient
 
-### Run: 
-	python main.py -ssm input/simple_somatic_mutation.open.tsv
-	python main.py -ssm input/ssm.ts -sv input/sv.tsv
+### Run:
+  	$ python main.py -ssm input/simple_somatic_mutation.open.tsv # if only ssm is available
+  	
+	$ python main.py -ssm input/ssm.ts -sv input/sv.tsv # if both ssm and sv are available
+	
+	$ python main.py -loop loopDB/loops.xlsx  # to caculate loop probability for loops
+
+	
 
 
 

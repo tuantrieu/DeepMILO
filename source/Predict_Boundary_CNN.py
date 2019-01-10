@@ -50,7 +50,7 @@ log_file = "log/boundary_prediction_log_%s.txt" % (datetime.now().strftime('%H_%
 cna = 2 #copy number alteration
 
 leaky = 0.2
-dropout = 0.15
+dropout = 0.2
 
 rnn_len = 0 #sequence length in input data, set to 0 to disable using RNN
 

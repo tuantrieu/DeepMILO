@@ -51,7 +51,7 @@ log_file = "log/loop_prediction_log_%s.txt" % (datetime.now().strftime('%H_%M_%d
 cna = 2 #copy number alteration
 
 leaky = 0.2
-dropout = 0.00
+dropout = 0.2
 
 rnn_len = 800 #sequence length to run RNN, set to 0 to disable using RNN
 
