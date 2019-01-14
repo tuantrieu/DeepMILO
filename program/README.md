@@ -1,5 +1,5 @@
 ## Requirement:
-+ Dependency packages: keras 2.1.4, h5py, numpy
++ Dependency packages: tensorflow 1.7, keras 2.2, h5py, numpy
 + Homo_sapiens.GRCh37.75.dna.primary_assembly.fa (downloaded from ensembl) in the current folder
 
 ## Folder content:
