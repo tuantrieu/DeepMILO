@@ -969,6 +969,32 @@ def getSSM(ssm_file):
     return(variants)
 
 
+def read_ssm_bed_file(variant_file):
+    '''
+    Read ssm in bed format from TCGA (WGS)
+    :param variant_file:
+    :return:
+    '''
+
+    rs = {}
+    vt = 'snp'
+    subtype = 'snp'
+    with open(variant_file, 'r') as fi:
+        for ln in fi.readlines():
+            st = re.split('[\t\n]', ln)
+            chrom = st[0]
+            start = int(st[1])
+            end = int(st[2])
+            ref = st[3]
+            alt = st[4]
+            caseid = st[5].replace('@Melanoma','')
+            var = Variant(chrom, start, end, id=caseid, specimen=caseid, type=vt, subtype=subtype,
+                          ref=ref, alt=alt)
+            if caseid not in rs:
+                rs[caseid] = []
+            rs[caseid].append(var)
+
+    return rs
 
 
 def getLoopXLSX(con_file):

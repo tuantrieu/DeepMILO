@@ -193,12 +193,13 @@ def main():
     parser = argparse.ArgumentParser(description='Process some integers.')
     parser.add_argument('-ssm', dest='ssm', default="", help='simple somatic mutation file')
     parser.add_argument('-sv', dest='sv', default="", help='structural variant file')
-    parser.add_argument('-loop', dest='loop_file', default = cons_loop_file, help='loop file')
+    parser.add_argument('-format', dest='format', default="tsv", help='file format (.bed) for TCGA WGS data, specify -ssm only (not -sv)')
+    parser.add_argument('-loop', dest='loop_file', default=cons_loop_file, help='loop file')
 
     opts = parser.parse_args()
 
     # retrieve mutations file name from arguments
-    inputF = 'tsv' #format file
+    inputF = opts.format #format file
     ssmFileName = opts.ssm
     svFileName = opts.sv
 
@@ -209,12 +210,17 @@ def main():
 
     print('Reading variants ...')
 
-    if ssmFileName:
-        ssmVariants = cdg.getSSM(ssmFileName)
-    if svFileName:
-        svVariants = cdg.getSV(svFileName)
+    if inputF == 'tsv':
+        if ssmFileName:
+            ssmVariants = cdg.getSSM(ssmFileName)
+        if svFileName:
+            svVariants = cdg.getSV(svFileName)
+        variants = {**ssmVariants, **svVariants}
 
-    variants = {**ssmVariants, **svVariants}
+    elif inputF == 'bed':
+        variants = cdg.read_ssm_bed_file(ssmFileName)
+
+
 
     if '.xlsx' in loop_file:
         loops = cdg.getLoopXLSX(loop_file)
