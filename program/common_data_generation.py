@@ -979,6 +979,7 @@ def read_ssm_bed_file(variant_file):
     rs = {}
     vt = 'snp'
     subtype = 'snp'
+    gt = '1|1'
     with open(variant_file, 'r') as fi:
         for ln in fi.readlines():
             st = re.split('[\t\n]', ln)
@@ -988,8 +989,9 @@ def read_ssm_bed_file(variant_file):
             ref = st[3]
             alt = st[4]
             caseid = st[5].replace('@Melanoma','')
-            var = Variant(chrom, start, end, id=caseid, specimen=caseid, type=vt, subtype=subtype,
-                          ref=ref, alt=alt)
+
+            var = Variant('', chrom, start, end, vt, subtype, ref, alt, gt)
+
             if caseid not in rs:
                 rs[caseid] = []
             rs[caseid].append(var)
