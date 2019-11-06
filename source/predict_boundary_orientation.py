@@ -52,12 +52,12 @@ rnn_len = 800  # sequence length to run RNN, set to 0 to disable using RNN
 version = ''
 
 
-boundary_model_file = 'model/boundary_4k_cnnlstm_ruan_1gpu.h5'
+boundary_model_file = 'model/boundary_4k_sepcnnlstm_ruan_1gpu.h5'
 
 existing_model = ''
 
-output_model = 'model/direction_pred_4k_ruan.h5'
-output_best_model = 'model/direction_pred_4k_best_ruan.h5'
+output_model = 'model/direction_pred_sep_4k_ruan.h5'
+output_best_model = 'model/direction_pred_sep_4k_best_ruan.h5'
 
 file_train_data = 'data/data_boundary_direction_4k_train_ruan.mat'
 file_train_label = 'data/label_boundary_direction_4k_train_ruan.mat'

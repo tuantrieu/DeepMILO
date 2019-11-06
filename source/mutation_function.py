@@ -428,6 +428,12 @@ def mutate_sv(bou, var, seq, seq_record):
         warnings.warn('Mutation and boundary are not overlapped, boundary: {}, var: {}'.format(str(bou), str(var)))
         return seq
 
+    if len(seq) == 0:  #
+        warnings.warn('sequence is deleted completely')
+        return seq
+
+    #orig_seq = seq[:]
+
     vt = var.vt
     if vt != 'sv':
         sys.stderr.write('This is not SV\n')
@@ -466,12 +472,12 @@ def mutate_sv(bou, var, seq, seq_record):
     #
     #     warnings.warn('reference seq (original): {} should be the same ref in variant: {}'.format(
     #         str(seq_record[bou.start: bou.end][offset: offset + end - start].seq), ref))
-
+    #print('come here')
     if vt == 'sv':
         if svtype == 'DEL':
             offset = max(0, offset)  # DEL starts before boundary starts
             start = max(start, bou.start)  # if DEL start before boundary starts
-
+            #print('offset + end - start >= len(seq): {} >= {}'.format(offset + end - start, len(seq)))
             if offset + end - start >= len(seq):  # deletion beyond end of boundary
                 seq = seq[0:offset]
 
@@ -489,6 +495,8 @@ def mutate_sv(bou, var, seq, seq_record):
                 'reverse it and take [: variant.end - bou.start]
                 'add it to the rest of seq[j]'''
                 seq = seq_record[start:end].seq.tomutable()[::-1][bou.start - start:] + seq[end - bou.start:]
+
+                #print('offset:{}, {}'.format(offset, str(var)))
 
 
         elif svtype == 'DUP' or svtype == 'DUP:TANDEM':
@@ -527,6 +535,23 @@ def mutate_sv(bou, var, seq, seq_record):
 
                     if offset_end < len(seq):
                          seq = seq[:offset_end] + (str(st) * (cp - 1)) + seq[offset_end:]
+
+        else:
+            sys.stderr.write('wrong svtype in mutation_function:{}\n'.format(svtype))
+
+    else:
+        sys.stderr.write('sv is not process:{}\n'.format(vt))
+
+    # if len(seq) > 0 and svtype != 'DUP':
+    #     diff_count = 0
+    #     for i in range(min(len(seq), len(orig_seq))):
+    #         if seq[i] != orig_seq[i]:
+    #             diff_count += 1
+    #
+    #     if diff_count == 0:
+    #         sys.stderr.write('sv has no effect: len is {}, {}, {} - {}\n'.format(len(seq), str(bou),hex(id(bou)), str(var)))
+    #     #else:
+    #         #print('number of differences by SV:{}, {},{} - {}'.format(diff_count, str(bou), hex(id(bou)), str(var)))
 
     return seq
 
@@ -600,9 +625,44 @@ def infer_true_seq(bou, seq_record, segment_size = REGION_SIZE):
         boundary (a region class): 0-based start position, 1-based end position
     '''
 
+    if bou.seq:
+        return bou.seq
+
+    # remove overlapping variants
+    # if len(bou.variants) > 0:
+    #     bou.variants = sorted(bou.variants, key=lambda x: (x.chrid, x.start, x.end))
+    #     variants = [bou.variants[0]]
+    #     for var in bou.variants[1:]:
+    #         lastvar = variants[-1]
+    #         if var.overlap(lastvar):
+    #             # var contains lastvar
+    #             if var.start <= lastvar.start and lastvar.end <= var.end:
+    #                 variants[-1] = var
+    #             # lastvar contains var, not possible
+    #             elif lastvar.start <= var.start and var.end <= lastvar.end:
+    #                 continue
+    #             else:
+    #                 variants.append(var)
+    #
+    #         else:
+    #             variants.append(var)
+    #
+    #     print('number of variants before:{}, number of variants after:{}'.format(len(bou.variants), len(variants)))
+    #     bou.variants = variants
+    #######################
+
+
     # mutate from variants with larger start site so that coordinate of other variants conserved
     # if same start positions, process smaller ones first
     bou.variants = sorted(bou.variants, key=lambda x: (x.chrid, -x.start, (x.end - x.start)))
+
+    for i in range(len(bou.variants) - 1):
+        if bou.variants[i].chrid == bou.variants[i + 1].chrid and bou.variants[i].start == bou.variants[i + 1].start\
+                and bou.variants[i].end == bou.variants[i + 1].end:
+
+            print('duplicate variants:{}'.format(str(bou.variants[i])))
+
+
 
     # seq_record1 = chrom_list[bou.chrom]
     seq = seq_record[bou.start: bou.end].seq.tomutable()
@@ -622,5 +682,6 @@ def infer_true_seq(bou, seq_record, segment_size = REGION_SIZE):
             seq = mutate_sv(bou, var, seq, seq_record)
 
     seq = padding_truncating(seq, segment_size)
+    bou.seq = seq
 
     return seq

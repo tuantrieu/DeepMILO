@@ -73,6 +73,7 @@ class PatientRegion(Region):
         self.ref_score = -100
         self.patient_scores = {}
         self.gene_list = []
+        self.cpn = None # copy number
 
 
 '''----------------------------------------------'''

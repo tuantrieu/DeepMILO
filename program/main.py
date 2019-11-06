@@ -36,18 +36,21 @@ import numpy as np
 
 from keras.utils import multi_gpu_model
 
-
-# import variant_class
-import boundary_class
-import data_generator
-import common_data_generation as cdg
+import copy
 
 import argparse
+import sys
+import re
 
+from common_object import Loop, Variant, Boundary
+import common_function as cf
+import output_function as of
+import data_generator
 
 
 ref_genome_file = 'Homo_sapiens.GRCh37.75.dna.primary_assembly.fa'
-cons_loop_file = 'loopDB/constitutive_loops.xlsx'
+cons_loop_file = 'loopDB/all_insulator_loop.bed'
+
 
 # os.environ["CUDA_VISIBLE_DEVICES"] = "4,5,6,7"
 loop_model_file = 'model/loop_pred_4k_1gpu.h5'
@@ -65,6 +68,230 @@ nbr_feature = 10
 rnn_len = 800
 
 
+def getSSM_bedfile(ssm_file, cohort='Eric_CLL'):
+
+    cohort = cohort.replace('Eric_','')
+
+    variants = {}
+    count = 0
+    with open(ssm_file) as fi:
+        for ln in fi.readlines():
+            st = re.split('[\t\n]+',ln)
+
+            # print('line:', ln)
+            # print('st:', st)
+
+            if st[6] != cohort:
+                continue
+
+
+            chrom = st[0]
+            start = int(st[1])
+            end = int(st[2])
+            sample_id = st[3]
+
+            if sample_id not in variants:
+                variants[sample_id] = []
+
+            ref = st[4]
+            alt = st[5]
+            vt = 'snp'
+            svtype = None
+            gt = '1|1'
+            count += 1
+            var = Variant(chrom, start, end, vt, svtype, ref, alt, gt)
+
+            variants[sample_id].append(var)
+
+    print('number of samples:{}, number of mutation:{}, mutations/sample:{}'.format(len(variants), count,
+                                                                                    float(count)/len(variants)))
+    return variants
+
+
+def getSSM(ssm_file):
+    variants = {}  # icgc_sample_id: variants
+    processed_mut = set()  # processsed mutation to handle duplicate records
+
+    # for i in range(len(ssm)):
+    with open(ssm_file, 'r') as fin:
+
+        ln = fin.readline()
+
+        fields = re.split('\t', ln)
+        field2Id = {}
+        for i in range(len(fields)):
+            field2Id[fields[i]] = i
+
+        icgc_mutation_id = field2Id['icgc_mutation_id']
+        chromosome_id = field2Id['chromosome']
+        chromosome_start_id = field2Id['chromosome_start']
+        chromosome_end_id = field2Id['chromosome_end']
+        mutation_type_id = field2Id['mutation_type']
+        reference_genome_allele_id = field2Id['reference_genome_allele']
+
+        if 'tumour_genotype' in fields:
+            tumour_genotype_id = field2Id['tumour_genotype']
+        else:
+            mutated_to_allele_id = field2Id['mutated_to_allele']
+
+        icgc_sample_id = field2Id['icgc_sample_id']
+
+        for ln in fin.readlines():
+
+            st = re.split('\t', ln)
+
+            mut_id = st[icgc_mutation_id]
+
+            if mut_id in processed_mut:
+                #print(mut_id)
+                continue
+
+            processed_mut.add(mut_id)
+
+            chrid = str(st[chromosome_id]).upper()
+            if not re.search('^[0-9XY]+', chrid):
+                print(chrid)
+                continue
+
+            start = int(st[chromosome_start_id]) - 1
+            end = int(st[chromosome_end_id])
+            vt = st[mutation_type_id]
+
+            ref = st[reference_genome_allele_id]
+
+            if 'tumour_genotype' in fields:
+                # control_gt = ssm.loc[i, 'control_genotype']
+                tumor_gt = st[tumour_genotype_id]
+            else:
+                tumor_gt = st[mutated_to_allele_id]
+
+            sample_id = st[icgc_sample_id]
+
+            if sample_id not in variants:
+                variants[sample_id] = []
+
+            '''
+            mutating by replacing ref. with alt.
+            if alt == '', in insertation, it means no insertation ( if ref == '')
+                          in deletion, it means deleting ref
+
+            if insertion, ref is always -, must be converted to ''
+            '''
+            # Variant(sample, rc.CHROM, start, end, dvt, dsvtype, rc.REF, rc.ALT, gt )
+
+            ref = '' if ref == '-' else ref
+
+            if re.search('substitution', vt):
+                vt = 'snp'
+                svtype = ''
+            elif re.search('deletion', vt):
+                vt = 'indel'
+                svtype = 'del'
+            elif re.search('insertion', vt):
+                vt = 'indel'
+                svtype = 'ins'
+
+            # alternative
+            alt = re.split('[|/]', tumor_gt)
+            alt = [x if x != '-' else '' for x in alt]  # convert '-' to empty
+
+            if len(alt) == 1:  # if there is only one allele, make another from it
+                alt.append(alt[0])
+
+            # 0: for reference seq, therefore + 1
+            # if insertion, gt = '' can be 0
+            gt = '|'.join([str(alt.index(x) + 1) for x in alt])
+
+            if vt == 'snp' and ref == '':
+                print('error, snp but ref. is not available')
+
+            #print('chrom:{}, start:{}, end:{}, vt:{}, subtype:{}, ref:{}, alt:{}'.format(chrid, start, end, vt, svtype, ref, alt))
+
+            var = Variant('chr' + chrid, start, end, vt, svtype, ref, alt, gt)
+            variants[sample_id].append(var)
+
+    print('Number of sample:{}, number of variants{}'.format(len(variants), len(processed_mut)))
+    return variants
+
+
+def getSV(stvm_file):
+    variants = {}
+
+    processed_sv = set()
+
+    with open(stvm_file, 'r') as fin:
+        ln = fin.readline()
+        fields = re.split('\t', ln)
+        field2Id = {}
+        for i in range(len(fields)):
+            field2Id[fields[i]] = i
+
+        sv_header_id = field2Id['sv_id']
+        variant_type_id = field2Id['variant_type']
+        chr_from_id = field2Id['chr_from']
+        chr_to_id = field2Id['chr_to']
+        icgc_sample_id = field2Id['icgc_sample_id']
+        chr_from_bkpt_id = field2Id['chr_from_bkpt']
+        chr_to_bkpt_id = field2Id['chr_to_bkpt']
+
+        for ln in fin.readlines():
+            st = re.split('\t', ln)
+
+            sv_id = st[sv_header_id]
+
+            if sv_id in processed_sv:
+                continue
+
+            processed_sv.add(sv_id)
+
+            svtype = st[variant_type_id]
+
+            #        if svtype == 'unbalanced translocation':
+            #            continue
+
+            chrid_from = st[chr_from_id].upper()
+            chrid_to = st[chr_to_id].upper()
+
+            # ignore inter-chromosome SV
+            if (chrid_from != chrid_to) or (not re.search('^[0-9XY]+', chrid_from)) \
+                    or (not re.search('^[0-9XY]+', chrid_to)):
+                continue
+
+            sample_id = st[icgc_sample_id]
+            if sample_id not in variants:
+                variants[sample_id] = []
+
+            chrom = 'chr' + chrid_from
+            start = int(st[chr_from_bkpt_id]) - 1
+            end = int(st[chr_to_bkpt_id])
+
+            if svtype == 'deletion':
+                svtype = 'DEL'
+            elif svtype == 'inversion':
+                svtype = 'INV'
+            elif svtype == 'tandem duplication':
+                svtype = 'DUP'
+            else:
+                sys.stderr.write('wrong svtype:{}\n'.format(svtype))
+
+
+            ref = ''
+            alt = ''
+            gt = '1|1'
+            vt = 'sv'
+
+            var = Variant(chrom, start, end, vt, svtype, ref, alt, gt)
+            variants[sample_id].append(var)
+
+    for sample, vars in variants.items():
+        for i in range(len(vars) - 1):
+            if vars[i].chrid == vars[i + 1].chrid and vars[i].start == vars[i + 1].start\
+                and vars[i].end == vars[i + 1].end:
+
+                print('duplicate variant, sample:{}, variants:{}'.format(sample, str(vars[i])))
+
+    print('Number of SV samples:', len(variants))
+    return variants
 
 def makeOutputFolder():
     jobID = str(int(time.time()))
@@ -97,10 +324,7 @@ def get_prediction(model_file, data_file, isloop=True):
 
     rs = {}
 
-    if isloop:
-        generator = data_generator.DataGeneratorLoopSeq(data_file, None, shuffle=False, use_reverse=False, **params)
-    else:
-        generator = data_generator.DataGenerator(data_file, None, shuffle=False, use_reverse=False, **params)
+    generator = data_generator.DataGeneratorLoopSeq(data_file, None, shuffle=False, use_reverse=False, **params)
 
     prediction = model.predict_generator(generator, verbose=1)
     # print(prediction, len(generator.ids_list))
@@ -123,39 +347,49 @@ def output_prob(rs, file_name):
 
     fout.close()
 
+def process_eachpatient(consloop, varlist, segment_size, ref_genome_file, output_file):
 
-def process_eachpatient(loops, varlist, segment_size, ref_genome_file, output_file):
-    """Generate data file for each patient
+    if os.path.exists(output_file):
+        return
 
-    """
-    [looplist, _] = cdg.get_loop(loops, varlist, segment_size, isNormalize=False, isNonLoop=False, noLargeSV=False)
+    loops = copy.deepcopy(consloop)
 
-    looplist = [x for x in looplist if len(x.b1.variants) > 0 or len(x.b2.variants) > 0]
+
+    boundaries = [x.b1 for x in loops] + [x.b2 for x in loops]
+
+    cf.overlap_variants(boundaries, varlist)
+
+    varlens = [len(x.variants) for x in boundaries]
+    print('min: {}, max:{}, mean:{}, median{}, sum:{}'.format(np.min(varlens), np.max(varlens), np.mean(varlens), np.median(varlens),np.sum(varlens)))
+
+    looplist = [x for x in loops if len(x.b1.variants) > 0 or len(x.b2.variants) > 0]
+
     if len(looplist) > 0:
         print(output_file)
         print('number of affected loops: %d' % (len(looplist)))
 
         if output_file:
-            cdg.output_loop(looplist, ref_genome_file, segment_size, output_file, None)
+
+                of.output_loop(looplist, ref_genome_file, segment_size, output_file, None)
 
 
 def generate_patientdata(variants, loops, nbr_job, jobID):
     print('Creating input data for all patients...')
 
     # data file for each patient
-    consitutive_loop_data_sampleid = lambda x: '%s/%s_loop_%s.mat' % (jobID, x, jobID)
+    outputfile_loop_data_sampleid = lambda x: '%s/%s_loop_%s.mat' % (jobID, x, jobID)
 
     if nbr_job > 1:
         pool = mp.Pool(processes=nbr_job)
         result = [pool.apply_async(process_eachpatient, args=(loops, variants[k], segment_size,
-                                                          ref_genome_file, consitutive_loop_data_sampleid(k))) for k in
+                                                          ref_genome_file, outputfile_loop_data_sampleid(k))) for k in
                   variants]
         pool.close()
         pool.join()
 
     else:
         for k in variants:
-            process_eachpatient(loops, variants[k], segment_size, ref_genome_file, consitutive_loop_data_sampleid(k))
+            process_eachpatient(loops, variants[k], segment_size, ref_genome_file, outputfile_loop_data_sampleid(k))
 
     print('Done preparing data')
 
@@ -186,6 +420,25 @@ def makePrediction(loop_model_file, inputFolder, outputFolder):
 
         output_prob(rs, output_file)
 
+def read_loop(loop_file):
+    '''
+    Loops are in bed format: chr1	803273	807273	.	.	chr1	1225118	1229118	.	.
+    :param loop_file:
+    :return:
+    '''
+    loop_list = []
+    with open(loop_file) as fi:
+        for ln in fi.readlines():
+            st = ln.split()
+            b1 = Boundary(st[0], st[1], st[2])
+            b2 = Boundary(st[5], st[6], st[7])
+            lp = Loop(b1, b2)
+            loop_list.append(lp)
+
+    return loop_list
+
+
+
 ############################## Generating data
 
 def main():
@@ -212,34 +465,28 @@ def main():
 
     if inputF == 'tsv':
         if ssmFileName:
-            ssmVariants = cdg.getSSM(ssmFileName)
+            ssmVariants = getSSM(ssmFileName)
         if svFileName:
-            svVariants = cdg.getSV(svFileName)
+            svVariants = getSV(svFileName)
         variants = {**ssmVariants, **svVariants}
 
     elif inputF == 'bed':
-        variants = cdg.read_ssm_bed_file(ssmFileName)
+        variants = getSSM_bedfile(ssmFileName)
 
-
-
-    if '.xlsx' in loop_file:
-        loops = cdg.getLoopXLSX(loop_file)
-    else:
-        loops = boundary_class.read_loop(loop_file)
-
+    loops = read_loop(loop_file)
 
 
     #calculate probability for loops without mutations
     if not ssmFileName and not svFileName:
         print('No variants found, calculating loop probability for loops ...')
 
-        output_seq_file = loop_file.replace(".xlsx", ".mat")
-        [loops, _] = cdg.get_loop(loops, [], segment_size, isNormalize=False, isNonLoop=False, noLargeSV=False)
-        cdg.output_loop(loops, ref_genome_file, segment_size, output_seq_file, None)
+        output_seq_file = loop_file.replace(".bed", ".mat")
+
+        of.output_loop(loops, ref_genome_file, segment_size, output_seq_file, None)
 
         rs = get_prediction(loop_model_file, output_seq_file)
 
-        output_prob(rs, output_seq_file.replace(".mat", "_probability.txt"))
+        output_prob(rs, output_seq_file.replace(".mat", "_no_mutation_probability.txt"))
 
         os.remove(output_seq_file)
 
