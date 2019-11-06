@@ -171,8 +171,18 @@ def overlap_variants(regions, variants, noLargeSV=False):
     Important note: a variant can be in multiple regions
     '''
 
-    regions = sorted(regions, key=lambda x: (x.chrid, x.start))
-    variants = sorted(variants, key=lambda x: (x.chrid, x.start))
+    regions = sorted(regions, key=lambda x: (x.chrid, x.start, x.end))
+
+    #remove duplicate region objects if there is any
+    reglist = [regions[0]]
+    for i in range(1, len(regions)):
+        if regions[i] is not regions[i - 1]:
+            reglist.append(regions[i])
+
+    regions = reglist
+
+
+    variants = sorted(variants, key=lambda x: (x.chrid, x.start, x.end))
     for x in regions:
         x.variants = []
 
@@ -184,15 +194,33 @@ def overlap_variants(regions, variants, noLargeSV=False):
 
         for j in range(lastid, len(variants)):
 
-            # if  variants[j].chrid == reg.chrid and max(reg.start, variants[j].start) <= min(reg.end, variants[j].end) :
+
             if reg.overlap(variants[j]) > 0:
 
                 if not noLargeSV or (noLargeSV and reg.overlap(variants[j]) < reg.end - reg.start):
                     #print(reg, variants[j], reg.overlap(variants[j]), reg.end - reg.start)
                     reg.variants.append(variants[j])
 
-            if variants[j].chrid > reg.chrid or (variants[j].chrid == reg.chrid and variants[j].start > reg.end):
+            elif variants[j].chrid > reg.chrid or (variants[j].chrid == reg.chrid and variants[j].start > reg.end):
                 break
+
+    ##remove duplicate variants in regions
+    # for reg in regions:
+    #     if len(reg.variants) == 0:
+    #         continue
+    #
+    #     varlist = [reg.variants[0]]
+    #     reg.variants = sorted(reg.variants, key=lambda x: (x.chrid, x.start, x.end))
+    #     for i in range(1, len(reg.variants)):
+    #         if reg.variants[i].chrid != reg.variants[i - 1].chrid or reg.variants[i].start != reg.variants[i - 1].start\
+    #                 or reg.variants[i].end != reg.variants[i - 1].end:
+    #
+    #             varlist.append(reg.variants[i])
+    #
+    #     reg.variants = varlist[:]
+
+
+
 
 def test_overlap_variants():
 

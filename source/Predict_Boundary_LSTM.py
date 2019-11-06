@@ -60,18 +60,37 @@ dropout = 0.2
 
 rnn_len = 800  # sequence length to run RNN, set to 0 to disable using RNN
 
+cohort = 'k562'
+suffix = '_loocv'
 
-output_model_cnn = "model/boundary_lstm_4k_800_ruan.h5"
-output_best_model = "model/boundary_lstm_4k_800_best_ruan.h5"
 
-file_train_data = 'data/data_boundary_4k_train_ruan.mat'
-file_train_label = 'data/label_boundary_4k_train_ruan.mat'
+# output_model_cnn = "model/boundary_lstm_4k_800_ruan.h5"
+# output_best_model = "model/boundary_lstm_4k_800_best_ruan.h5"
+#
+# file_train_data = 'data/data_boundary_4k_train_ruan.mat'
+# file_train_label = 'data/label_boundary_4k_train_ruan.mat'
+#
+# file_val_data = 'data/data_boundary_4k_val_ruan.mat'
+# file_val_label = 'data/label_boundary_4k_val_ruan.mat'
+#
+# file_test_data = 'data/data_boundary_4k_test_ruan.mat'
+# file_test_label = 'data/label_boundary_4k_test_ruan.mat'
 
-file_val_data = 'data/data_boundary_4k_val_ruan.mat'
-file_val_label = 'data/label_boundary_4k_val_ruan.mat'
+output_model_cnn = "model/boundary_lstm_4k_800_{}.h5".format(suffix + cohort)
+output_best_model = "model/boundary_lstm_4k_800_best_{}.h5".format(suffix + cohort)
 
-file_test_data = 'data/data_boundary_4k_test_ruan.mat'
-file_test_label = 'data/label_boundary_4k_test_ruan.mat'
+file_train_data = 'data/data_boundary_4k_train_leftout_{}.mat'.format(cohort)
+file_train_label = 'data/label_boundary_4k_train_leftout_{}.mat'.format(cohort)
+
+file_val_data = 'data/data_boundary_4k_val_leftout_{}.mat'.format(cohort)
+file_val_label = 'data/label_boundary_4k_val_leftout_{}.mat'.format(cohort)
+
+file_test_data1 = 'data/data_boundary_4k_test_type1_leftout_{}.mat'.format(cohort)
+file_test_label1 = 'data/label_boundary_4k_test_type1_leftout_{}.mat'.format(cohort)
+file_test_data2 = 'data/data_boundary_4k_test_type2_leftout_{}.mat'.format(cohort)
+file_test_label2 = 'data/label_boundary_4k_test_type2_leftout_{}.mat'.format(cohort)
+file_test_data3 = 'data/data_boundary_4k_test_type3_leftout_{}.mat'.format(cohort)
+file_test_label3 = 'data/label_boundary_4k_test_type3_leftout_{}.mat'.format(cohort)
 
 
 
@@ -97,9 +116,15 @@ params = {'dim': (segment_size, nbr_feature),
 train_generator = data_generator.DataGenerator(file_train_data, file_train_label, shuffle=True, **params)
 val_generator = data_generator.DataGenerator(file_val_data, file_val_label, shuffle=False,
                                              **params)  # set shuffle=False to calculate AUC
-test_generator = data_generator.DataGenerator(file_test_data, file_test_label, shuffle=False, use_reverse=False,
-                                              **params)  # set shuffle=False to calculate AUC
+# test_generator = data_generator.DataGenerator(file_test_data, file_test_label, shuffle=False, use_reverse=False,
+#                                               **params)  # set shuffle=False to calculate AUC
 
+test_generator1 = data_generator.DataGenerator(file_test_data1, file_test_label1, shuffle=False, use_reverse=False,
+                                              **params)  # set shuffle=False to calculate AUC
+test_generator2 = data_generator.DataGenerator(file_test_data2, file_test_label2, shuffle=False, use_reverse=False,
+                                              **params)  # set shuffle=False to calculate AUC
+test_generator3 = data_generator.DataGenerator(file_test_data3, file_test_label3, shuffle=False, use_reverse=False,
+                                              **params)  # set shuffle=False to calculate AUC
 
 ########### architecture
 
@@ -173,7 +198,12 @@ pmodel.save_weights(output_best_model)
 model.save(output_model_cnn.replace('.h5', '_1gpu.h5'))
 model.save_weights(output_best_model.replace('.h5', '_1gpu.h5'))
 
-ef.evaluate(pmodel, test_generator, flog=flog)
+#ef.evaluate(pmodel, test_generator, flog=flog)
+
+ef.evaluate(pmodel, test_generator1, flog=flog, name=file_test_label1, output_file=file_test_label1.replace('.mat','_lstm_output.txt'))
+ef.evaluate(pmodel, test_generator2, flog=flog, name=file_test_label2, output_file=file_test_label2.replace('.mat','_lstm_output.txt'))
+ef.evaluate(pmodel, test_generator3, flog=flog, name=file_test_label3, output_file=file_test_label3.replace('.mat','_lstm_output.txt'))
+
 
 #########
 flog.close()
