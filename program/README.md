@@ -6,8 +6,8 @@
 * model: contains the loop model
 * input: contains sample input files (simple somatic mutation from ICGC)
 * loopDB:
-	* constitutive_loops.xlsx: list of constitutive loops
-	* constitutive_loop_probability.txt: probability of constitutive loops without mutations 	
+	* all_insulator_loop.bed: list of constitutive loops
+	* all_loop_probabilities.txt: probability of insulator loops without mutations 	
 	
 			
 
@@ -35,7 +35,7 @@
   	
 `$ python main.py -ssm input/ssm.ts -sv input/sv.tsv` # if both ssm and sv are available
 	
-`$ python main.py -loop loopDB/loops.xlsx`  # to caculate loop probability for loops
+`$ python main.py -loop loopDB/all_insulator_loop.bed`  # to caculate loop probability without mutation for loops 
 
 	
 
